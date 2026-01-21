@@ -16,9 +16,23 @@ def init_db():
         CREATE TABLE IF NOT EXISTS users (
             username TEXT PRIMARY KEY,
             password TEXT NOT NULL,
-            email TEXT
+            email TEXT,
+            theme_mode TEXT DEFAULT 'Light',
+            primary_color TEXT DEFAULT '#0D9488'
         )
     ''')
+    
+    # Migration for existing tables (safe to run every time)
+    try:
+        c.execute("ALTER TABLE users ADD COLUMN theme_mode TEXT DEFAULT 'Light'")
+    except sqlite3.OperationalError:
+        pass # Column exists
+        
+    try:
+        c.execute("ALTER TABLE users ADD COLUMN primary_color TEXT DEFAULT '#0D9488'")
+    except sqlite3.OperationalError:
+        pass # Column exists
+    
     conn.commit()
     conn.close()
 
@@ -107,3 +121,29 @@ def get_canonical_username(identifier):
     result = c.fetchone()
     conn.close()
     return result[0] if result else identifier
+
+def get_preferences(username):
+    """Get user preferences (theme_mode, primary_color)."""
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("SELECT theme_mode, primary_color FROM users WHERE username = ?", (username,))
+    result = c.fetchone()
+    conn.close()
+    if result:
+        return {"theme_mode": result[0] or "Light", "primary_color": result[1] or "#0D9488"}
+    return {"theme_mode": "Light", "primary_color": "#0D9488"}
+
+def update_preferences(username, theme_mode, primary_color):
+    """Update user theme preferences."""
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    try:
+        c.execute("UPDATE users SET theme_mode = ?, primary_color = ? WHERE username = ?", 
+                  (theme_mode, primary_color, username))
+        conn.commit()
+        return True
+    except Exception as e:
+        print(f"Error updating preferences: {e}")
+        return False
+    finally:
+        conn.close()

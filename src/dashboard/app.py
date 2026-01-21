@@ -26,8 +26,183 @@ st.set_page_config(
 
 # Custom CSS for "Clean Corporate/Enterprise" Light UI
 def load_css(file_name):
+    # Base CSS
     with open(file_name) as f:
         st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
+    
+    # Dynamic Theme Overrides
+    
+    theme_mode = st.session_state.get("theme_mode", "Light")
+    primary_color = st.session_state.get("primary_color", "#0D9488")
+    
+    # 2. Primary Color Global Override
+    color_css = f"""
+    :root {{
+        --primary-color: {primary_color};
+    }}
+    """
+    
+    
+    # 1. Dark Mode Variables (Override CSS Variables)
+    dark_css = ""
+    if theme_mode == "Dark":
+        dark_css = """
+        :root {
+            /* Main Background: Deep Blue-Green / Dark Teal */
+            --bg-color: #0B1215; 
+            
+            /* Secondary/Sidebar: Slightly lighter/different tone */
+            --bg-secondary: #0F191E;
+            
+            /* Cards: Lighter shade of the background for depth */
+            --card-bg: #162226;
+            
+            /* Text: Soft Off-White (Primary) & Muted Cyan/Gray (Secondary) */
+            --text-title: #ECFEFF; /* Cyan 50 */
+            --text-body: #CFFAFE; /* Cyan 100 */
+            --text-muted: #67E8F9; /* Cyan 300 - acting as muted/secondary */
+            
+            /* Borders: Subtle, low-contrast */
+            --border-color: #20353B;
+            --border-hover: #29454D;
+            
+            /* Shadows: Soft glow effect */
+            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.5);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.6);
+            
+            /* Accents overridden for Dark Mode visibility */
+            --color-success: #34D399; /* Emerald 400 (Soft Green) */
+            --color-warning: #FBBF24; /* Amber 400 (Low saturation yellow-orange) */
+            --color-error: #F87171;   /* Red 400 (Muted Red) */
+            --color-info: #38BDF8;    /* Sky 400 */
+            
+            /* Backgrounds for Badges/Alerts */
+            --bg-success-light: rgba(52, 211, 153, 0.15);
+            --bg-warning-light: rgba(251, 191, 36, 0.15);
+            --bg-error-light: rgba(248, 113, 113, 0.15);
+            --bg-info-light: rgba(56, 189, 248, 0.15);
+        }
+        
+        /* Dashboard Specific Overrides */
+        .stApp { 
+            background-color: var(--bg-color); 
+            color: var(--text-body); 
+        }
+        
+        /* Force Plotly Charts to be transparent to blend */
+        .js-plotly-plot .plotly .main-svg {
+            background-color: transparent !important;
+        }
+        
+        /* Streamlit Input Widgets Dark Styling */
+        div[data-baseweb="select"] > div, 
+        div[data-baseweb="input"] > div, 
+        div[data-baseweb="base-input"] {
+            background-color: #0F191E !important;
+            border-color: #20353B !important;
+            color: #ECFEFF !important;
+        }
+        
+        /* Dropdown options */
+        div[data-baseweb="popover"], div[data-baseweb="menu"] {
+            background-color: #162226 !important;
+            border-color: #20353B !important;
+        }
+        
+        input { color: #ECFEFF !important; }
+        
+        /* Fix Invisible Labels in Dark Mode */
+        label, .stMarkdown p, .stRadio label, .stCheckbox label, .stMultiSelect label, .stTextInput label, .stNumberInput label {
+            color: var(--text-body) !important;
+        }
+        
+        /* Specific Override for Radio/Checkbox Group Options */
+        div[role="radiogroup"] label p, 
+        div[data-baseweb="checkbox"] label p,
+        div[data-testid="stCheckbox"] label p {
+            color: var(--text-body) !important;
+        }
+
+        /* Fix Secondary Buttons (Export, View, etc.) - Make them Dark Teal */
+        button[kind="secondary"], 
+        button[data-testid="baseButton-secondary"],
+        a[data-testid="stDownloadButton"] {
+            background-color: #162226 !important;
+            color: #ECFEFF !important;
+            border: 1px solid #20353B !important;
+        }
+        
+        button[kind="secondary"]:hover, 
+        button[data-testid="baseButton-secondary"]:hover,
+        a[data-testid="stDownloadButton"]:hover {
+            border-color: #67E8F9 !important;
+            color: #67E8F9 !important;
+            background-color: #0F191E !important;
+        }
+
+        /* HEADER STYLING FOR DARK MODE */
+        header[data-testid="stHeader"] {
+            background-color: var(--bg-color) !important;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        /* Fix Header Icons/Text Visibility */
+        header[data-testid="stHeader"] .st-emotion-cache-15w659t, /* Generic class catch (fragile but helper) */
+        header[data-testid="stHeader"] button,
+        header[data-testid="stHeader"] svg,
+        header[data-testid="stHeader"] span {
+            color: var(--text-body) !important;
+            fill: var(--text-body) !important;
+        }
+
+        /* Scrollbar styling for dark mode */
+        ::-webkit-scrollbar {
+          width: 8px;
+          height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+          background: #0B1215; 
+        }
+        ::-webkit-scrollbar-thumb {
+          background: #20353B; 
+          border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+          background: #29454D; 
+        }
+        /* Sidebar Styling for Dark Mode */
+        section[data-testid="stSidebar"] {
+            background-color: var(--bg-secondary) !important;
+            border-right: 1px solid var(--border-color);
+        }
+        
+        /* Force all text in sidebar to be visible */
+        section[data-testid="stSidebar"] .stMarkdown,
+        section[data-testid="stSidebar"] p,
+        section[data-testid="stSidebar"] span,
+        section[data-testid="stSidebar"] label,
+        section[data-testid="stSidebar"] div {
+            color: var(--text-body) !important;
+        }
+        
+        section[data-testid="stSidebar"] h1, 
+        section[data-testid="stSidebar"] h2, 
+        section[data-testid="stSidebar"] h3 {
+            color: var(--text-title) !important;
+        }
+
+        /* Fix User Profile Text specifically if mostly bespoke HTML */
+        section[data-testid="stSidebar"] h3 {
+            color: #F8FAFC !important; /* Ensuring the profile name is bright white/slate-50 */
+        }
+
+        /* Sidebar specific scrollbar adjustments if needed */
+        section[data-testid="stSidebar"] ::-webkit-scrollbar-track {
+            background: var(--bg-secondary);
+        }
+        """
+
+    st.markdown(f'<style>{dark_css}{color_css}</style>', unsafe_allow_html=True)
 
 # Load External CSS
 css_path = Path("src/dashboard/assets/css/style.css")
@@ -36,7 +211,6 @@ if css_path.exists():
 else:
     st.warning("CSS file not found. Styles may be missing.")
 
-# --- IMPORTS ---
 # --- IMPORTS ---
 try:
     from views.auth_view import login_page
@@ -55,9 +229,19 @@ except ImportError:
 # --- Authentication UI ---
 # (Logic moved to views/auth_view.py)
 
+import extra_streamlit_components as stx
+
 def logout():
+    # Clear cookie
+    cookie_manager = stx.CookieManager()
+    cookie_manager.delete("auth_username")
+    
     st.session_state.logged_in = False
     st.session_state.username = None
+    # Clear preferences on logout to avoid stale state for next user
+    if "theme_mode" in st.session_state: del st.session_state.theme_mode
+    if "primary_color" in st.session_state: del st.session_state.primary_color
+    st.rerun()
 
 # --- Helper Functions (Loaders) ---
 
@@ -174,6 +358,18 @@ def generate_json_report(df: pd.DataFrame) -> str:
     return json.dumps(report, indent=2)
 
 
+# --- Theme Aware Helpers ---
+def get_plotly_template():
+    """Returns the appropriate plotly template based on current theme."""
+    mode = st.session_state.get("theme_mode", "Light")
+    if mode == "Dark":
+        return "plotly_dark"
+    return "plotly_white"
+
+def get_chart_colors():
+    """Returns chart colors consistent with theme."""
+    # We can stick to standard colors (Red/Amber) but maybe adjust background/grid via template
+    return None
 # --- Main App ---
 
 def render_filters(df: pd.DataFrame):
@@ -354,6 +550,14 @@ def main():
         login_page()
         st.stop()
     
+    # --- Theme State Initialization ---
+    if st.session_state.logged_in:
+        # Load preferences if not set in session (e.g. fresh reload)
+        if "theme_mode" not in st.session_state or "primary_color" not in st.session_state:
+            prefs = auth.get_preferences(st.session_state.username)
+            st.session_state.theme_mode = prefs.get("theme_mode", "Light")
+            st.session_state.primary_color = prefs.get("primary_color", "#0D9488")
+    
     # Sidebar: User Profile & Actions
     with st.sidebar:
         st.markdown(f"""
@@ -367,6 +571,19 @@ def main():
         <hr style="border-color: #334155;">
         """, unsafe_allow_html=True)
         
+        # Theme Toggle
+        current_theme = st.session_state.get("theme_mode", "Light")
+        new_theme = "Dark" if current_theme == "Light" else "Light"
+        btn_label = "Dark Mode 🌙" if current_theme == "Light" else "Light Mode ☀️"
+        
+        if st.button(btn_label, use_container_width=True):
+            st.session_state.theme_mode = new_theme
+            # Persist
+            if st.session_state.username:
+                auth.update_preferences(st.session_state.username, new_theme, st.session_state.get("primary_color", "#0D9488"))
+            st.rerun()
+            
+        st.markdown('<div style="height: 12px"></div>', unsafe_allow_html=True)
         st.button("Logout", on_click=logout, type="secondary", use_container_width=True)
 
     # --- Navigation Logic ---
@@ -550,7 +767,13 @@ def main():
     
                     if not error_data.empty or not warning_data.empty:
                         fig = go.Figure()
-    
+
+                        # Theme Colors for Charts
+                        is_dark = st.session_state.get("theme_mode", "Light") == "Dark"
+                        chart_text_color = '#ECFEFF' if is_dark else '#000000'
+                        chart_muted_color = '#94A3B8' if is_dark else '#64748B'
+                        chart_grid_color = '#20353B' if is_dark else '#F1F5F9'
+
                         # Add Warnings Trace (Amber)
                         if not warning_data.empty:
                             fig.add_trace(go.Scatter(
@@ -582,31 +805,34 @@ def main():
                         fig.update_layout(
                             title=dict(
                                 text="Error & Warning Trends",
-                                font=dict(size=14, color='#1E293B'),
+                                font=dict(size=14, color=chart_text_color),
                                 x=0
                             ),
                             legend=dict(
-                                orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1
+                                orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1,
+                                font=dict(color=chart_text_color)
                             ),
                             paper_bgcolor='rgba(0,0,0,0)',
                             plot_bgcolor='rgba(0,0,0,0)',
                             margin=dict(l=0, r=0, t=40, b=0),
                             xaxis=dict(
                                 showgrid=True, 
-                                gridcolor='#F1F5F9', 
+                                gridcolor=chart_grid_color, 
                                 title=None, 
-                                tickfont=dict(color='#94A3B8')
+                                tickfont=dict(color=chart_muted_color)
                             ),
                             yaxis=dict(
                                 showgrid=True, 
-                                gridcolor='#F8FAFC', 
+                                gridcolor=chart_grid_color, 
                                 title=None, 
-                                tickfont=dict(color='#94A3B8')
+                                tickfont=dict(color=chart_muted_color)
                             ),
                             height=320,
-                            hovermode="x unified"
+                            hovermode="x unified",
+                            template=get_plotly_template(),
+                            font=dict(color=chart_text_color)
                         )
-                        st.plotly_chart(fig, config={'displayModeBar': False}, width="stretch")
+                        st.plotly_chart(fig, config={'displayModeBar': False}, width="stretch", theme=None)
                     else:
                         st.info("No data for selected period")
                 else:
@@ -627,6 +853,12 @@ def main():
                 colors = ['#0D9488', '#EAB308', '#EF4444'] # Teal, Amber, Red
                 
                 if curr_total > 0:
+                    
+                    # Recalculate colors if needed for dark mode? No, semantic colors are fine.
+                    # Just layout colors.
+                    is_dark = st.session_state.get("theme_mode", "Light") == "Dark"
+                    chart_text_color = '#ECFEFF' if is_dark else '#000000'
+
                     fig_donut = go.Figure(data=[go.Pie(
                         labels=levels_data['Level'],
                         values=levels_data['Count'],
@@ -639,10 +871,15 @@ def main():
                         plot_bgcolor='rgba(0,0,0,0)',
                         margin=dict(l=0, r=0, t=0, b=0),
                         showlegend=True,
-                        legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5),
-                        height=280
+                        legend=dict(
+                            orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5,
+                            font=dict(color=chart_text_color)
+                        ),
+                        height=280,
+                        template=get_plotly_template(),
+                        font=dict(color=chart_text_color)
                     )
-                    st.plotly_chart(fig_donut, config={'displayModeBar': False}, width="stretch")
+                    st.plotly_chart(fig_donut, config={'displayModeBar': False}, width="stretch", theme=None)
                 else:
                      st.markdown('<div style="height:280px; display:flex; align-items:center; justify-content:center; color:#94A3B8;">No Data</div>', unsafe_allow_html=True)
                 
@@ -685,7 +922,7 @@ def main():
                                  
                              with c3:
                                  # Count & Action
-                                 st.markdown(f'<div style="text-align:right; font-weight:700; font-size:1.1rem; color:#1E293B;">{count}</div>', unsafe_allow_html=True)
+                                 st.markdown(f'<div style="text-align:right; font-weight:700; font-size:1.1rem; color:var(--text-title);">{count}</div>', unsafe_allow_html=True)
                                  if st.button("View", key=f"btn_err_{idx}", type="secondary", use_container_width=True):
                                      # Get examples for this error
                                      examples = error_data[error_data['message'] == message]

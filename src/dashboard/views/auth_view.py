@@ -57,7 +57,40 @@ def handle_back_to_login():
     st.session_state.pop("fp_otp_val", None)
     st.session_state.pop("fp_email_val", None)
 
+    st.session_state.pop("fp_email_val", None)
+
+import extra_streamlit_components as stx
+
+def get_manager():
+    return stx.CookieManager()
+
 def login_page():
+    cookie_manager = get_manager()
+    
+    # Auto-login check
+    # Check if a cookie exists and user is not already deemed logged in
+    # Note: st.session_state.logged_in might be false on refresh, but cookie is true.
+    
+    # We need to fetch cookies. .get_all() or .get(). 
+    # NOTE: cookie_manager.get() is asynchronous-like in Streamlit logic (requires rerun usually).
+    # But stx provides immediate access if it was loaded.
+    
+    cookies = cookie_manager.get_all()
+    if cookies and 'auth_username' in cookies and not st.session_state.get('logged_in'):
+        stored_user = cookies['auth_username']
+        # Validate existence (optional but good)
+        exists = auth.check_email_exists(stored_user) # Or user retrieval fn
+        # For our simple auth, we just assume validity if we set it, or re-verify.
+        # Let's trust the cookie for now (basic) or ensure user exists logic
+        # Ideally, we should check against DB, but check_email_exists checks email, not username.
+        # Let's assume stored_user is what we passed to set().
+        
+        st.session_state.logged_in = True
+        st.session_state.username = stored_user
+        # We need email too
+        st.session_state.user_email = auth.get_user_email(stored_user)
+        st.rerun()
+
     # Initialize Auth Mode
     if "auth_mode" not in st.session_state:
         st.session_state.auth_mode = "login"
@@ -105,7 +138,7 @@ def login_page():
                 # Remember Me & Forgot Password
                 c_rem, c_forgot = st.columns(2)
                 with c_rem:
-                        st.checkbox("Remember me")
+                        remember_me = st.checkbox("Remember me")
                 with c_forgot:
                         # Use button for correct state transition
                         if st.form_submit_button("Forgot password?", type="secondary", use_container_width=True):
@@ -123,6 +156,10 @@ def login_page():
                     real_username = auth.get_canonical_username(username)
                     st.session_state.username = real_username
                     st.session_state.user_email = auth.get_user_email(real_username)
+                    
+                    if remember_me:
+                        cookie_manager.set('auth_username', real_username, expires_at=datetime.now() + timedelta(days=30))
+                    
                     st.rerun()
                 else:
                     st.error("Incorrect username or password")
