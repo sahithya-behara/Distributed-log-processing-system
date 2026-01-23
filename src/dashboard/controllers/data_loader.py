@@ -124,8 +124,8 @@ def process_log_dataframe(df: pd.DataFrame) -> pd.DataFrame:
             if 'month' in df.columns and 'date' in df.columns and 'time' in df.columns:
                 try:
                     # Construct string: "2025 Jun 14 15:16:01"
-                    # Default year 2025
-                    current_year = "2025"
+                    # Default to current year
+                    current_year = str(datetime.now().year)
                     combined_linux = current_year + " " + df['month'].astype(str) + " " + df['date'].astype(str) + " " + df['time'].astype(str)
                     # Parse
                     df['timestamp'] = pd.to_datetime(combined_linux, format='%Y %b %d %H:%M:%S', errors='coerce')

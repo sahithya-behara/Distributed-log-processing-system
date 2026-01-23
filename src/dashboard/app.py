@@ -167,6 +167,37 @@ def load_css(file_name):
             background-color: var(--bg-color) !important;
             border-bottom: 1px solid var(--border-color);
         }
+
+        /* POPOVER DARK MODE SUPPORT */
+        /* POPOVER DARK MODE SUPPORT */
+        /* POPOVER DARK MODE SUPPORT - TARGETED */
+        [data-testid="stPopoverBody"] {
+            background-color: #162226 !important;
+            border: 1px solid #20353B !important;
+            min-width: 350px !important;
+        }
+        
+        /* Ensure text is visible in the container */
+        [data-testid="stPopoverBody"] > div {
+             color: #ECFEFF !important;
+        }
+
+        /* Re-assert input/select backgrounds inside popover just in case */
+        [data-testid="stPopoverBody"] input,
+        [data-testid="stPopoverBody"] div[data-baseweb="select"] > div {
+             background-color: #0F191E !important;
+             border-color: #20353B !important;
+        }
+
+        /* Attractive MultiSelect Tags in Dark Mode */
+        [data-testid="stPopoverBody"] span[data-baseweb="tag"] {
+            background-color: rgba(13, 148, 136, 0.3) !important; /* Teal transparent */
+            border: 1px solid #2DD4BF !important; /* Teal 400 */
+        }
+        [data-testid="stPopoverBody"] span[data-baseweb="tag"] span {
+            color: #CCFBF1 !important; /* Teal 100 */
+            font-weight: 600 !important;
+        }
         
         /* Fix Header Icons/Text Visibility */
         header[data-testid="stHeader"] .st-emotion-cache-15w659t, /* Generic class catch (fragile but helper) */
@@ -178,6 +209,11 @@ def load_css(file_name):
         }
 
         /* Scrollbar styling for dark mode */
+        /* Force Scrollbar to prevent layout shift */
+        div[data-testid="stAppViewContainer"] {
+            overflow-y: scroll;
+        }
+
         ::-webkit-scrollbar {
           width: 8px;
           height: 8px;
@@ -240,7 +276,7 @@ try:
     from views.auth_view import login_page
     from views.settings_view import render_settings
     from views.input_view import render_input_page
-    from views import dashboard_view
+    from views import dashboard_view, search_view
     from controllers.data_loader import load_raw_data_v2, filter_data
     from components.ui_components import view_error_details, view_alert_history, render_kpi, render_progress_bar, view_analysis_history
     import history_manager
@@ -251,7 +287,7 @@ except ImportError:
     from views.auth_view import login_page
     from views.settings_view import render_settings
     from views.input_view import render_input_page
-    from views import dashboard_view
+    from views import dashboard_view, search_view
     from controllers.data_loader import load_raw_data_v2, filter_data
     from components.ui_components import view_error_details, view_alert_history, render_kpi, render_progress_bar, view_analysis_history
     import history_manager
@@ -680,6 +716,10 @@ def main():
             view_analysis_history(st.session_state.get('username'))
             
         st.markdown('<div style="height: 12px"></div>', unsafe_allow_html=True)
+
+        if st.button("🔍 Search Logs", use_container_width=True, type="secondary" if st.session_state.page != "search" else "primary"):
+            st.session_state.page = "search"
+            st.rerun()
         
         if st.button("New Analysis 🔄", use_container_width=True):
             st.session_state.data_ready = False
@@ -695,6 +735,9 @@ def main():
 
     if st.session_state.page == "settings":
         render_settings()
+    elif st.session_state.page == "search":
+        # Pass raw df to search view (it handles its own isolation)
+        search_view.render_search_view(st.session_state.get('log_data', pd.DataFrame()))
     elif not st.session_state.data_ready:
         render_input_page()
     else:
