@@ -63,16 +63,21 @@ def get_history(username=None):
     try:
         df = pd.read_sql_query(query, conn, params=params)
         return df
-    except Exception:
+    except Exception as e:
+        print(f"Error fetching history: {e}")
         return pd.DataFrame()
     finally:
         conn.close()
 
 def get_analysis_data_path(record_id):
     """Get the parquet path for a specific record."""
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute("SELECT data_path FROM analysis_history WHERE id = ?", (record_id,))
-    result = c.fetchone()
-    conn.close()
-    return result[0] if result else None
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        c.execute("SELECT data_path FROM analysis_history WHERE id = ?", (record_id,))
+        result = c.fetchone()
+        conn.close()
+        return result[0] if result else None
+    except Exception as e:
+        print(f"Error fetching analysis data path: {e}")
+        return None

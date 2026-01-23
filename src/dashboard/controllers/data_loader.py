@@ -134,9 +134,9 @@ def process_log_dataframe(df: pd.DataFrame) -> pd.DataFrame:
             # Spark/Windows Logs: Date, Time
             if 'timestamp' not in df.columns and 'date' in df.columns and 'time' in df.columns:
                 try:
-                    # Normalize columns to string and strip whitespace
-                    d_str = df['date'].astype(str).str.strip().str.replace('[', '').str.replace(']', '')
-                    t_str = df['time'].astype(str).str.strip().str.replace('[', '').str.replace(']', '').str.replace(',', '.') 
+                    # Normalize columns to string and strip whitespace/brackets
+                    d_str = df['date'].astype(str).str.strip().str.replace(r'[\[\]]', '', regex=True)
+                    t_str = df['time'].astype(str).str.strip().str.replace(r'[\[\]]', '', regex=True).str.replace(',', '.') 
                     combined = d_str + ' ' + t_str
                     
                     # Try parsing with multiple formats
@@ -182,7 +182,9 @@ def process_log_dataframe(df: pd.DataFrame) -> pd.DataFrame:
             df = df.dropna(subset=['timestamp'])
             
         return df
-    except Exception:
+
+    except Exception as e:
+        print(f"Error processing dataframe: {e}")
         return pd.DataFrame()
 
 def filter_data(df: pd.DataFrame, date_range, search_query: str, selected_levels: list, service_source: str) -> pd.DataFrame:

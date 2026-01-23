@@ -2,8 +2,10 @@ import sqlite3
 import pandas as pd
 from datetime import datetime
 import os
+from pathlib import Path
 
-DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "data", "alerts.db")
+# Use Pathlib for robust path handling (src/dashboard/alerts.py -> ... -> data/alerts.db)
+DB_PATH = str(Path(__file__).parent.parent.parent.joinpath("data", "alerts.db"))
 
 def init_db():
     """Initialize the alerts database."""
@@ -77,6 +79,113 @@ def get_alerts(limit=100, start_date=None, end_date=None):
         print(f"Failed to fetch alerts: {e}")
         return pd.DataFrame()
 
+def check_high_error_rate(df, total, errors, threshold=10, is_in_cooldown=False, target_email=None, top_errors_str=""):
+    """Check for high error rate."""
+    if total == 0: return None
+    
+    rate = (errors / total * 100)
+    
+    if rate > threshold and not is_in_cooldown:
+        msg = f"High Error Rate Detected: {rate:.2f}%"
+        details = f"Total Logs: {total}\nError Count: {errors}\n{top_errors_str}"
+        metrics = {"Total Logs": total, "Error Count": errors, "Error Rate": f"{rate:.2f}%"}
+        html = create_html_body("High Error Rate Detected", msg, metrics, top_errors_str)
+        
+        save_alert("High Error Rate", msg, "Critical", details, html_body=html, target_email=target_email)
+        return {"message": msg, "severity": "Critical"}
+    return None
+
+def check_critical_rate(df, total, top_errors_str="", threshold=10, is_in_cooldown=False, target_email=None):
+    """Check for high critical log rate."""
+    if total == 0: return None
+    
+    criticals = len(df[df['log_level'] == 'CRITICAL']) if 'log_level' in df.columns else 0
+    crit_rate = (criticals / total * 100)
+    
+    if crit_rate > threshold and not is_in_cooldown:
+        msg = f"Critical Log Rate Exceeds {threshold}%: {crit_rate:.2f}%"
+        details = f"Total: {total}, Criticals: {criticals}\n{top_errors_str}"
+        metrics = {"Total Logs": total, "Critical Logs": criticals, "Critical Rate": f"{crit_rate:.2f}%"}
+        html = create_html_body("Critical Log Spike", msg, metrics, top_errors_str)
+        
+        save_alert("High Critical Rate", msg, "Critical", details, html_body=html, target_email=target_email)
+        return {"message": msg, "severity": "Critical"}
+    return None
+
+def check_frequent_patterns(df, errors, is_in_cooldown=False, target_email=None):
+    """Check for frequent error patterns and bursts."""
+    triggered = []
+    
+    if 'message' not in df.columns or 'log_level' not in df.columns:
+        return triggered
+
+    err_df = df[df['log_level'] == 'ERROR'].copy()
+    if err_df.empty:
+        return triggered
+
+    # Batch Frequency Check (> 5 occurrences)
+    error_counts = err_df['message'].value_counts()
+    freq_errors = error_counts[error_counts > 5]
+    
+    if not freq_errors.empty and not is_in_cooldown:
+        count_of_patterns = len(freq_errors)
+        top_pattern = freq_errors.index[0]
+        top_count = freq_errors.iloc[0]
+        
+        msg = f"Frequent Error Detected: {top_pattern} ({top_count} times)"
+        if count_of_patterns > 1:
+            msg = f"Multiple Frequent Errors Detected ({count_of_patterns} types)"
+
+        details_lines = ["Errors occurring > 5 times:"]
+        for err_msg, count in freq_errors.items():
+            details_lines.append(f"- {err_msg}: {count} occurrences")
+        details = "\n".join(details_lines)
+        
+        metrics = {
+            "Unique Frequent Errors": count_of_patterns,
+            "Top Error Count": top_count,
+            "Total Errors in Batch": errors
+        }
+        
+        html = create_html_body("Frequent Error Patterns Detected", msg, metrics, details)
+        save_alert("Frequent Error Pattern", msg, "Critical", details, html_body=html, target_email=target_email)
+        triggered.append({"message": msg, "severity": "Critical"})
+
+    # Burst Check (> 20 occurrences in 1 Hour)
+    # Ensure valid timestamp index
+    if 'timestamp' in err_df.columns:
+         # Clean timestamps
+         err_df['timestamp'] = pd.to_datetime(err_df['timestamp'], errors='coerce')
+         err_df = err_df.dropna(subset=['timestamp'])
+         
+         if not err_df.empty:
+             # Identify messages with > 20 occurrences *total* first to filter
+             potential_msgs = error_counts[error_counts > 20].index.tolist()
+             
+             high_freq_triggered = False
+             for target_msg in potential_msgs:
+                 if high_freq_triggered: break # Avoid spamming multiple alerts for same burst
+                 
+                 sub_df = err_df[err_df['message'] == target_msg].sort_values('timestamp')
+                 # Check rolling count
+                 try:
+                     rolling_counts = sub_df.set_index('timestamp').rolling('1h').count()
+                     
+                     if not rolling_counts.empty and rolling_counts['message'].max() > 20:
+                          max_burst = int(rolling_counts['message'].max())
+                          msg = f"Alert: Error Burst Detected - '{target_msg}' ({max_burst}/hr)"
+                          details = f"Error '{target_msg}' occurred {max_burst} times in a single hour window."
+                          
+                          metrics = {"Burst Rate": f"{max_burst}/hr", "Error Message": target_msg}
+                          html = create_html_body("Error Burst Detected", msg, metrics, details)
+                          
+                          save_alert("Error Burst", msg, "Critical", details, html_body=html, target_email=target_email)
+                          triggered.append({"message": msg, "severity": "Critical"})
+                          high_freq_triggered = True
+                 except Exception: pass
+
+    return triggered
+
 def check_alerts(df: pd.DataFrame, force=False, target_email=None):
     """
     Analyze dataframe for conditions to trigger alerts.
@@ -86,7 +195,7 @@ def check_alerts(df: pd.DataFrame, force=False, target_email=None):
     
     triggered_alerts = []
     
-    # Common Data: Top 5 Errors for Details
+    # Common Data
     top_errors_str = ""
     if 'message' in df.columns and 'log_level' in df.columns:
         err_df = df[df['log_level'] == 'ERROR']
@@ -94,125 +203,37 @@ def check_alerts(df: pd.DataFrame, force=False, target_email=None):
             top = err_df['message'].value_counts().head(20)
             top_errors_str = "Top Errors:\n" + "\n".join([f"- {msg} ({count})" for msg, count in top.items()])
 
-    # --- Rule 1: High Error Rate (> 10%) ---
     total = len(df)
     errors = len(df[df['log_level'] == 'ERROR']) if 'log_level' in df.columns else 0
-    rate = (errors / total * 100) if total > 0 else 0
     
     # Deduplication / Cooldown Logic
     is_in_cooldown = False
     if not force:
-        last_alerts = get_alerts(limit=1)
-        last_alert_time = datetime.min
-        if not last_alerts.empty:
-             try:
+        try:
+            last_alerts = get_alerts(limit=1)
+            last_alert_time = datetime.min
+            if not last_alerts.empty:
                  last_ts_str = last_alerts.iloc[0]['timestamp']
                  last_alert_time = datetime.fromisoformat(last_ts_str)
-             except: pass
-             
-        time_since_last = (datetime.now() - last_alert_time).total_seconds()
-        is_in_cooldown = time_since_last < 3600 
-    
-    if rate > 10 and not is_in_cooldown:
-        msg = f"High Error Rate Detected: {rate:.2f}%"
-        # Combine stats and top errors in details
-        details = f"Total Logs: {total}\nError Count: {errors}\n{top_errors_str}"
-        
-        metrics = {"Total Logs": total, "Error Count": errors, "Error Rate": f"{rate:.2f}%"}
-        html = create_html_body("High Error Rate Detected", msg, metrics, top_errors_str)
-        
-        save_alert("High Error Rate", msg, "Critical", details, html_body=html, target_email=target_email)
-        triggered_alerts.append({"message": msg, "severity": "Critical"})
-        
-    # --- Rule 2: Critical Log Rate (> 10% of total logs are CRITICAL) ---
-    # User Request: "Critical Rate > 10%"
-    # Assuming this means log_level == 'CRITICAL'
-    criticals = len(df[df['log_level'] == 'CRITICAL']) if 'log_level' in df.columns else 0
-    crit_rate = (criticals / total * 100) if total > 0 else 0
-    
-    if crit_rate > 10 and not is_in_cooldown:
-         msg = f"Critical Log Rate Exceeds 10%: {crit_rate:.2f}%"
-         details = f"Total: {total}, Criticals: {criticals}\n{top_errors_str}"
-         
-         metrics = {"Total Logs": total, "Critical Logs": criticals, "Critical Rate": f"{crit_rate:.2f}%"}
-         html = create_html_body("Critical Log Spike", msg, metrics, top_errors_str)
-         
-         save_alert("High Critical Rate", msg, "Critical", details, html_body=html, target_email=target_email)
-         triggered_alerts.append({"message": msg, "severity": "Critical"})
-
-    # --- Rule 3: Frequent Error Patterns (> 5 occurrences) ---
-    if 'message' in df.columns and 'log_level' in df.columns:
-        err_df = df[df['log_level'] == 'ERROR'].copy()
-        if not err_df.empty:
-            # Existing Rule: > 5 occurrences (Batch)
-            error_counts = err_df['message'].value_counts()
-            freq_errors = error_counts[error_counts > 5]
-            
-            if not freq_errors.empty and not is_in_cooldown:
-                count_of_patterns = len(freq_errors)
-                top_pattern = freq_errors.index[0]
-                top_count = freq_errors.iloc[0]
-                
-                msg = f"Frequent Error Detected: {top_pattern} ({top_count} times)"
-                if count_of_patterns > 1:
-                    msg = f"Multiple Frequent Errors Detected ({count_of_patterns} types)"
-
-                details_lines = ["Errors occurring > 5 times:"]
-                for err_msg, count in freq_errors.items():
-                    details_lines.append(f"- {err_msg}: {count} occurrences")
-                details = "\n".join(details_lines)
-                
-                metrics = {
-                    "Unique Frequent Errors": count_of_patterns,
-                    "Top Error Count": top_count,
-                    "Total Errors in Batch": errors
-                }
-                
-                html = create_html_body("Frequent Error Patterns Detected", msg, metrics, details)
-                save_alert("Frequent Error Pattern", msg, "Critical", details, html_body=html, target_email=target_email)
-                triggered_alerts.append({"message": msg, "severity": "Critical"})
-
-            # --- New Rule: > 20 occurrences in 1 Hour ---
-            # Ensure valid timestamp index
-            if 'timestamp' in err_df.columns:
-                 # Clean timestamps
-                 err_df['timestamp'] = pd.to_datetime(err_df['timestamp'], errors='coerce')
-                 err_df = err_df.dropna(subset=['timestamp'])
                  
-                 if not err_df.empty:
-                     # Identify messages with > 20 occurrences *total* first to filter
-                     potential_msgs = error_counts[error_counts > 20].index.tolist()
-                     
-                     high_freq_triggered = False
-                     for target_msg in potential_msgs:
-                         if high_freq_triggered: break # Avoid spamming multiple alerts for same burst
-                         
-                         sub_df = err_df[err_df['message'] == target_msg].sort_values('timestamp')
-                         # Rolling count in 1H window
-                         # We set index to timestamp, then roll
-                         # result is count of events in the window ending at index time
-                         rolling_counts = sub_df.set_index('timestamp').rolling('1h').count()
-                         
-                         # rolling_counts will have column 'message' (and others) with counts
-                         # Check if any window has count > 20
-                         if not rolling_counts.empty and rolling_counts['message'].max() > 20:
-                             max_val = int(rolling_counts['message'].max())
-                             
-                             alert_msg = f"High Velocity Error: {target_msg} (>20 in 1h)"
-                             det_msg = f"Error occurred {max_val} times in a single hour window."
-                             
-                             if not is_in_cooldown:
-                                 metrics_hf = {"Max Hourly Rate": max_val, "Error": target_msg}
-                                 html_hf = create_html_body("High Velocity Error Detected", alert_msg, metrics_hf, det_msg)
-                                 save_alert("High Velocity Error", alert_msg, "Critical", det_msg, html_body=html_hf, target_email=target_email)
-                                 triggered_alerts.append({"message": alert_msg, "severity": "Critical"})
-                                 high_freq_triggered = True
+            time_since_last = (datetime.now() - last_alert_time).total_seconds()
+            is_in_cooldown = time_since_last < 3600 
+        except Exception:
+            is_in_cooldown = False
 
-    # If forced (Manual Check), ensure we record the context even if thresholds aren't met
+    # Check Rules
+    res1 = check_high_error_rate(df, total, errors, is_in_cooldown=is_in_cooldown, target_email=target_email, top_errors_str=top_errors_str)
+    if res1: triggered_alerts.append(res1)
+    
+    res2 = check_critical_rate(df, total, top_errors_str, is_in_cooldown=is_in_cooldown, target_email=target_email)
+    if res2: triggered_alerts.append(res2)
+    
+    res3 = check_frequent_patterns(df, errors, is_in_cooldown=is_in_cooldown, target_email=target_email)
+    if res3: triggered_alerts.extend(res3)
+
+    # Manual Force Check
     if force and not triggered_alerts:
         msg = "Manual Alert History Check"
-        # details = f"Total: {total}, Errors: {errors}\n{top_errors_str}"
-        # Removed save_alert to prevent database clutter for manual checks
         triggered_alerts.append({"message": msg, "severity": "Info"})
 
     return triggered_alerts
@@ -224,7 +245,17 @@ from email.mime.multipart import MIMEMultipart
 try:
     from . import email_config
 except ImportError:
-    import email_config
+    try:
+        import email_config
+    except ImportError:
+        # Graceful degradation if config is missing
+        class em_cfg:
+            SENDER_EMAIL = ""
+            SENDER_PASSWORD = ""
+            RECEIVER_EMAILS = []
+            SMTP_SERVER = ""
+            SMTP_PORT = 587
+        email_config = em_cfg()
 
 def create_html_body(title, message, metrics, top_errors_str):
     """

@@ -6,8 +6,8 @@ import history_manager
 from controllers.data_loader import load_data_from_stream
 
 def render_input_page():
-    # Ensure history DB is initialized (fast check)
-    history_manager.init_history_db()
+     # History DB initialized in app.py
+
     
     """
     Renders the Input Page where users upload their CSV file.

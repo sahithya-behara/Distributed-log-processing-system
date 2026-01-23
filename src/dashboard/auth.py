@@ -57,33 +57,41 @@ def create_user(username, password, email=""):
 
 def check_credentials(username, password):
     """Check if username and password match. Returns True if valid."""
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    # Check username OR email
-    c.execute("SELECT password FROM users WHERE username = ? OR email = ?", (username, username))
-    result = c.fetchone()
-    conn.close()
-    
-    if result:
-        stored_hash = result[0]
-        # Check password
-        if isinstance(stored_hash, str):
-            stored_hash = stored_hash.encode('utf-8')
-        try:
-            return bcrypt.checkpw(password.encode('utf-8'), stored_hash)
-        except ValueError:
-            # Handle invalid hash format gracefully
-            return False
-    return False
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        # Check username OR email
+        c.execute("SELECT password FROM users WHERE username = ? OR email = ?", (username, username))
+        result = c.fetchone()
+        conn.close()
+        
+        if result:
+            stored_hash = result[0]
+            # Check password
+            if isinstance(stored_hash, str):
+                stored_hash = stored_hash.encode('utf-8')
+            try:
+                return bcrypt.checkpw(password.encode('utf-8'), stored_hash)
+            except ValueError:
+                # Handle invalid hash format gracefully
+                return False
+        return False
+    except Exception as e:
+        print(f"Error checking credentials: {e}")
+        return False
 
 def check_email_exists(email):
     """Check if an email is registered. Returns username if found, else None."""
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute("SELECT username FROM users WHERE email = ?", (email,))
-    result = c.fetchone()
-    conn.close()
-    return result[0] if result else None
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        c.execute("SELECT username FROM users WHERE email = ?", (email,))
+        result = c.fetchone()
+        conn.close()
+        return result[0] if result else None
+    except Exception as e:
+        print(f"Error checking email: {e}")
+        return None
 
 def update_password(email, new_password):
     """Update password for the given email. Returns True if success."""
@@ -106,32 +114,44 @@ def update_password(email, new_password):
 
 def get_user_email(username):
     """Retrieve the email address for a given username."""
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute("SELECT email FROM users WHERE username = ?", (username,))
-    result = c.fetchone()
-    conn.close()
-    return result[0] if result else None
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        c.execute("SELECT email FROM users WHERE username = ?", (username,))
+        result = c.fetchone()
+        conn.close()
+        return result[0] if result else None
+    except Exception as e:
+        print(f"Error getting user email: {e}")
+        return None
 
 def get_canonical_username(identifier):
     """Retrieve the canonical username for a given identifier (username or email)."""
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute("SELECT username FROM users WHERE username = ? OR email = ?", (identifier, identifier))
-    result = c.fetchone()
-    conn.close()
-    return result[0] if result else identifier
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        c.execute("SELECT username FROM users WHERE username = ? OR email = ?", (identifier, identifier))
+        result = c.fetchone()
+        conn.close()
+        return result[0] if result else identifier
+    except Exception as e:
+        print(f"Error getting canonical username: {e}")
+        return identifier
 
 def get_preferences(username):
     """Get user preferences (theme_mode, primary_color)."""
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute("SELECT theme_mode, primary_color FROM users WHERE username = ?", (username,))
-    result = c.fetchone()
-    conn.close()
-    if result:
-        return {"theme_mode": result[0] or "Light", "primary_color": result[1] or "#0D9488"}
-    return {"theme_mode": "Light", "primary_color": "#0D9488"}
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        c.execute("SELECT theme_mode, primary_color FROM users WHERE username = ?", (username,))
+        result = c.fetchone()
+        conn.close()
+        if result:
+            return {"theme_mode": result[0] or "Light", "primary_color": result[1] or "#0D9488"}
+        return {"theme_mode": "Light", "primary_color": "#0D9488"}
+    except Exception as e:
+        print(f"Error getting preferences: {e}")
+        return {"theme_mode": "Light", "primary_color": "#0D9488"}
 
 def update_preferences(username, theme_mode, primary_color):
     """Update user theme preferences."""

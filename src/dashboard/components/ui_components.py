@@ -51,13 +51,26 @@ def render_progress_bar(label, value, max_val, color):
 </div>
 """, unsafe_allow_html=True)
 
-@st.dialog("Error Details")
+@st.dialog("Error Details", width="large")
 def view_error_details(message: str, count: int, examples: pd.DataFrame):
     """
     Dialog to show detailed information about an error.
     """
     st.markdown(f"### Error Message")
-    st.code(message, language="text")
+    st.markdown(f"""
+    <div style="
+        background-color: #1E293B; 
+        color: #F8FAFC; 
+        padding: 1rem; 
+        border-radius: 8px; 
+        font-family: monospace; 
+        white-space: pre-wrap; 
+        word-break: break-all;
+        border: 1px solid #334155;
+    ">
+    {message}
+    </div>
+    """, unsafe_allow_html=True)
     
     st.markdown("### Summary")
     c1, c2, c3 = st.columns(3)
@@ -175,7 +188,7 @@ def view_analysis_history(username):
     st.markdown("<hr style='margin: 4px 0 12px 0; border-color: #334155;'>", unsafe_allow_html=True)
 
     # Iteration (Limit to recent 50)
-    for index, row in df.iterrows():
+    for index, row in df.head(50).iterrows():
         c1, c2, c3, c4, c5, c6 = st.columns([1, 2, 2, 4, 1.5, 1.5])
         
         c1.write(f"#{row['id']}")
