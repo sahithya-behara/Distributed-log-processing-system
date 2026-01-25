@@ -679,3 +679,32 @@ input {
     box-shadow: var(--shadow-sm);
     z-index: 999;
 }
+
+/* --- DataFrame Styling --- */
+/* Target generic table headers (st.table) */
+th {
+    background-color: var(--primary-color) !important;
+    color: white !important;
+}
+
+/* Target DataGrid headers if exposed as DOM elements (varies by Streamlit version) */
+div[data-testid="stDataFrame"] div[role="columnheader"],
+div[data-testid="stDataFrame"] div[class*="header"] {
+    background-color: var(--primary-color) !important;
+    color: white !important;
+    font-weight: 600;
+}
+
+/* Force text color inside headers */
+div[data-testid="stDataFrame"] div[role="columnheader"] div,
+div[data-testid="stDataFrame"] div[class*="header"] div,
+div[data-testid="stDataFrame"] div[role="columnheader"] span,
+th span {
+    color: white !important;
+}
+
+/* styling for data grid cells header if using Glide Data Grid DOM overlay */
+[data-testid="stDataFrame"] [data-testid="column_header_content"] {
+    background-color: var(--primary-color) !important;
+    color: white !important;
+}

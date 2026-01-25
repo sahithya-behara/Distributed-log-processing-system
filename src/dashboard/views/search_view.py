@@ -7,69 +7,66 @@ from controllers.search_engine import search_logs
 @st.dialog("Search Filters")
 def filter_dialog(df, unique_levels):
     
-    with st.form("search_filters_form"):
-        st.markdown("### Search Filters")
+    st.markdown("### Search Filters")
 
-        # Calculate limits
-        min_val = None
-        max_val = None
-        if not df.empty and 'timestamp' in df.columns:
-                try:
-                    min_val = df['timestamp'].min().date()
-                    max_val = df['timestamp'].max().date()
-                except: pass
+    # Calculate limits
+    min_val = None
+    max_val = None
+    if not df.empty and 'timestamp' in df.columns:
+            try:
+                min_val = df['timestamp'].min().date()
+                max_val = df['timestamp'].max().date()
+            except: pass
 
-        # Date Range
-        if "widget_search_date" not in st.session_state:
-            st.session_state.widget_search_date = []
+    # Date Range
+    if "widget_search_date" not in st.session_state:
+        st.session_state.widget_search_date = []
 
-        search_dates = st.date_input(
-            "Date Range",
-            min_value=min_val,
-            max_value=max_val,
-            key="widget_search_date"
-        )
+    search_dates = st.date_input(
+        "Date Range",
+        min_value=min_val,
+        max_value=max_val,
+        key="widget_search_date"
+    )
+    
+    # Time Range
+    lbl_start, lbl_end = "Start Time", "End Time"
+    cur_dates = st.session_state.get("widget_search_date", [])
+    if cur_dates and isinstance(cur_dates, tuple):
+            s_d = cur_dates[0]
+            e_d = cur_dates[1] if len(cur_dates) > 1 else cur_dates[0]
+            if s_d != e_d:
+                lbl_start = f"Time ({s_d.strftime('%b %d')})"
+                lbl_end = f"Time ({e_d.strftime('%b %d')})"
+    
+    c_t1, c_t2 = st.columns(2)
+    with c_t1:
+        start_time = st.time_input(lbl_start, value=None, key="search_start_time")
+    with c_t2:
+        end_time = st.time_input(lbl_end, value=None, key="search_end_time")
+
+    # Levels
+    search_levels = st.multiselect(
+        "Log Levels",
+        unique_levels,
+        default=st.session_state.get("search_filter_levels", []),
+        key="search_filter_levels"
+    )
+    
+    # Callback needed here since form is isolated
+    def clear_filters_callback():
+        st.session_state.search_filter_levels = []
+        st.session_state.widget_search_date = []
+        st.session_state.search_start_time = None
+        st.session_state.search_end_time = None
         
-        # Time Range
-        lbl_start, lbl_end = "Start Time", "End Time"
-        cur_dates = st.session_state.get("widget_search_date", [])
-        if cur_dates and isinstance(cur_dates, tuple):
-                s_d = cur_dates[0]
-                e_d = cur_dates[1] if len(cur_dates) > 1 else cur_dates[0]
-                if s_d != e_d:
-                    lbl_start = f"Time ({s_d.strftime('%b %d')})"
-                    lbl_end = f"Time ({e_d.strftime('%b %d')})"
-        
-        c_t1, c_t2 = st.columns(2)
-        with c_t1:
-            start_time = st.time_input(lbl_start, value=None, key="search_start_time")
-        with c_t2:
-            end_time = st.time_input(lbl_end, value=None, key="search_end_time")
-
-        # Levels
-        search_levels = st.multiselect(
-            "Log Levels",
-            unique_levels,
-            default=st.session_state.get("search_filter_levels", []),
-            key="search_filter_levels"
-        )
-        
-        # Callback needed here since form is isolated
-        def clear_filters_callback():
-            st.session_state.search_filter_levels = []
-            st.session_state.widget_search_date = []
-            st.session_state.search_start_time = None
-            st.session_state.search_end_time = None
-            
-        c_apply, c_clear = st.columns([2, 1])
-        with c_apply:
-            submitted = st.form_submit_button("Apply Filters", use_container_width=True, type="primary")
-        with c_clear:
-            # Use on_click callback to safely modify state before rerun
-            cleared = st.form_submit_button("Clear", use_container_width=True, type="secondary", on_click=clear_filters_callback)
-
-        if submitted:
+    c_apply, c_clear = st.columns([2, 1])
+    with c_apply:
+        if st.button("Apply Filters", use_container_width=True, type="primary"):
             st.rerun()
+    with c_clear:
+        # Use on_click callback to safely modify state before rerun
+        st.button("Clear", use_container_width=True, type="secondary", on_click=clear_filters_callback)
 
 def render_search_view(df: pd.DataFrame):
     """
